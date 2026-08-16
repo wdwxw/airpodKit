@@ -10,3 +10,4 @@ AirPodKit.xcodeproj/
 
 # Compiled diagnostic spike binary — only main.swift is source.
 Spike/spike
+Spike/fake_media_key
