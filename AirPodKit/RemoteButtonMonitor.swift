@@ -14,9 +14,13 @@ enum RemoteButton: String, CaseIterable, Codable {
 final class RemoteButtonMonitor {
     static let shared = RemoteButtonMonitor()
 
-    /// Return true to consume (block) the original event; false to let the
-    /// system's default behavior (volume change / play-pause) happen.
-    var onButtonPress: ((RemoteButton) -> Bool)?
+    /// Called for both the down and up half of a press, `isDown` telling
+    /// which. Return true to consume (block) that event; false to let the
+    /// system's default behavior (volume change / play-pause) happen. Both
+    /// halves must be consumed together when mapped — the system can act
+    /// on either one, so swallowing only the down event still lets the up
+    /// event trigger the original action.
+    var onButtonPress: ((RemoteButton, _ isDown: Bool) -> Bool)?
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
@@ -103,7 +107,9 @@ final class RemoteButtonMonitor {
         let keyType = Int32((data1 & 0xFFFF0000) >> 16)
         let keyStateByte = Int32((data1 & 0xFF00) >> 8)
         let isDown = keyStateByte == 0x0A
-        guard isDown else { return Unmanaged.passUnretained(event) }
+        guard keyStateByte == 0x0A || keyStateByte == 0x0B else {
+            return Unmanaged.passUnretained(event)
+        }
 
         let button: RemoteButton?
         switch keyType {
@@ -113,7 +119,7 @@ final class RemoteButtonMonitor {
         default: button = nil
         }
 
-        guard let button, let onButtonPress, onButtonPress(button) else {
+        guard let button, let onButtonPress, onButtonPress(button, isDown) else {
             return Unmanaged.passUnretained(event)
         }
         return nil

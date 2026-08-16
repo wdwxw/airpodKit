@@ -13,11 +13,16 @@ enum RemapEngine {
     private static var permissionsCancellable: AnyCancellable?
 
     static func start() {
-        RemoteButtonMonitor.shared.onButtonPress = { button in
+        RemoteButtonMonitor.shared.onButtonPress = { button, isDown in
             guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
                 return false
             }
-            KeystrokeSynthesizer.post(shortcut)
+            // Consume both halves of the press so the system's default
+            // action (volume change / play-pause) can't fire off the
+            // untouched up event, but only synthesize once, on down.
+            if isDown {
+                KeystrokeSynthesizer.post(shortcut)
+            }
             return true
         }
 
