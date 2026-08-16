@@ -82,6 +82,16 @@ final class RecorderNSView: NSView {
         updateCandidateAndRestartTimer()
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Return/Tab/Escape are normally intercepted by the window as key
+        // equivalents (e.g. for a default/cancel button) before they ever
+        // reach keyDown. While recording, claim them here first so they
+        // land in our own capture logic instead.
+        guard isRecording else { return super.performKeyEquivalent(with: event) }
+        keyDown(with: event)
+        return true
+    }
+
     override func flagsChanged(with event: NSEvent) {
         guard isRecording else {
             super.flagsChanged(with: event)
