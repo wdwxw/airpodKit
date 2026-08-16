@@ -1,39 +1,43 @@
 import AppKit
 
-/// Last resort for the "macOS launches Music.app for Play/Pause anyway"
-/// problem (see CLAUDE.md — `com.apple.rcd` sends the TogglePlayPause
-/// command straight to `mediaremoted` outside any path we can intercept,
-/// and registering as a `MPRemoteCommandCenter`/`MPNowPlayingInfoCenter`
-/// candidate via `NowPlayingClaim` makes us *eligible* but doesn't win
-/// mediaremoted's — undocumented — arbitration over Music). If Music.app
-/// launches within a couple seconds of us having just handled a mapped
-/// button press, assume it's this fallback and terminate it immediately.
+/// Last-resort guard for the macOS media-routing path that can launch Music.app
+/// even after the NX_SYSDEFINED event was consumed. The notification is
+/// intentionally `willLaunch`, rather than `didLaunch`, so Music is terminated
+/// before it finishes starting and the user does not see a launch-then-close
+/// flash.
 enum MusicLaunchGuard {
-    private static let musicBundleID = "com.apple.Music"
-    private static let window: TimeInterval = 2.0
+    private static let musicBundleIDs: Set<String> = [
+        "com.apple.Music",
+        "com.apple.iTunes",
+    ]
+    private static let window: TimeInterval = 1.0
 
-    private static var lastMappedPressAt: Date?
+    private static var lastCenterPressAt: Date?
     private static var observer: NSObjectProtocol?
 
-    static func noteMappedPressHandled() {
-        lastMappedPressAt = Date()
+    static func noteCenterPressHandled() {
+        lastCenterPressAt = Date()
     }
 
     static func activate() {
         guard observer == nil else { return }
         observer = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didLaunchApplicationNotification,
+            forName: NSWorkspace.willLaunchApplicationNotification,
             object: nil,
             queue: .main
         ) { notification in
             guard
                 let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                app.bundleIdentifier == musicBundleID,
-                let pressedAt = lastMappedPressAt,
+                let bundleIdentifier = app.bundleIdentifier,
+                musicBundleIDs.contains(bundleIdentifier),
+                let pressedAt = lastCenterPressAt,
                 Date().timeIntervalSince(pressedAt) < window
             else { return }
 
-            DebugLog.log("MusicLaunchGuard: Music.app launched right after a mapped press — terminating it")
+            // Consume the timestamp before terminating so a delayed or
+            // unrelated launch notification cannot kill another Music launch.
+            lastCenterPressAt = nil
+            DebugLog.log("MusicLaunchGuard: \(bundleIdentifier) will launch after a mapped center press — terminating before startup")
             app.forceTerminate()
         }
     }

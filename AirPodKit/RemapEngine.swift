@@ -11,26 +11,57 @@ import Foundation
 /// start/stop the monitor to match, instead of only trying once at launch.
 enum RemapEngine {
     private static var permissionsCancellable: AnyCancellable?
+    /// Tracks mapped presses whose down event reached us. On newer macOS
+    /// versions, rcd can consume a media-key down event before the tap sees it;
+    /// an otherwise-unpaired up event is then used as a one-shot fallback.
+    private static var pendingMappedPresses: Set<RemoteButton> = []
+
+    private static func resetPendingPresses() {
+        pendingMappedPresses.removeAll()
+    }
 
     static func start() {
         DebugLog.log("=== AirPodKit launched (pid \(ProcessInfo.processInfo.processIdentifier)) ===")
 
-        NowPlayingClaim.activate()
+        // AirPodKit is a shortcut remapper, not a media player. Claiming Now
+        // Playing globally can steal ordinary media controls from Music,
+        // Spotify, and browser players. The launch guard below handles the
+        // remaining Music fallback without pretending to be a player.
         MusicLaunchGuard.activate()
 
         RemoteButtonMonitor.shared.onButtonPress = { button, isDown in
+            if isDown {
+                guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
+                    DebugLog.log("RemapEngine: \(button) has no mapping, letting default behavior happen")
+                    return false
+                }
+
+                pendingMappedPresses.insert(button)
+                if button == .center {
+                    MusicLaunchGuard.noteCenterPressHandled()
+                }
+                DebugLog.log("RemapEngine: synthesizing \(shortcut.displayString) for \(button)")
+                KeystrokeSynthesizer.post(shortcut)
+                return true
+            }
+
+            // A normal mapped press has already been synthesized on down; its
+            // up half is consumed only. If down was swallowed upstream, this
+            // up event is the only signal available, so synthesize once here.
+            if pendingMappedPresses.remove(button) != nil {
+                return true
+            }
+
             guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
                 DebugLog.log("RemapEngine: \(button) has no mapping, letting default behavior happen")
                 return false
             }
-            // Consume both halves of the press so the system's default
-            // action (volume change / play-pause) can't fire off the
-            // untouched up event, but only synthesize once, on down.
-            if isDown {
-                DebugLog.log("RemapEngine: synthesizing \(shortcut.displayString) for \(button)")
-                KeystrokeSynthesizer.post(shortcut)
-                MusicLaunchGuard.noteMappedPressHandled()
+
+            if button == .center {
+                MusicLaunchGuard.noteCenterPressHandled()
             }
+            DebugLog.log("RemapEngine: no down event for \(button); synthesizing on up as fallback")
+            KeystrokeSynthesizer.post(shortcut)
             return true
         }
 
@@ -43,6 +74,7 @@ enum RemapEngine {
                 if allGranted {
                     RemoteButtonMonitor.shared.start()
                 } else {
+                    resetPendingPresses()
                     RemoteButtonMonitor.shared.stop()
                 }
             }
