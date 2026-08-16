@@ -13,14 +13,18 @@ enum RemapEngine {
     private static var permissionsCancellable: AnyCancellable?
 
     static func start() {
+        DebugLog.log("=== AirPodKit launched (pid \(ProcessInfo.processInfo.processIdentifier)) ===")
+
         RemoteButtonMonitor.shared.onButtonPress = { button, isDown in
             guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
+                DebugLog.log("RemapEngine: \(button) has no mapping, letting default behavior happen")
                 return false
             }
             // Consume both halves of the press so the system's default
             // action (volume change / play-pause) can't fire off the
             // untouched up event, but only synthesize once, on down.
             if isDown {
+                DebugLog.log("RemapEngine: synthesizing \(shortcut.displayString) for \(button)")
                 KeystrokeSynthesizer.post(shortcut)
             }
             return true
