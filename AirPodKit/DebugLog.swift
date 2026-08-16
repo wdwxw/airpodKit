@@ -5,12 +5,14 @@ import Foundation
 /// launched via `open` / login item / Dock). Appends timestamped lines to
 /// ~/Library/Logs/AirPodKit/airpodkit.log.
 enum DebugLog {
-    private static let fileURL: URL = {
-        let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Logs/AirPodKit", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("airpodkit.log")
-    }()
+    private static let fileURL: URL = FileManager.default
+        .urls(for: .libraryDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("Logs/AirPodKit/airpodkit.log")
+
+    /// Never do filesystem I/O on the CGEventTap callback path. A slow write
+    /// can make WindowServer disable the tap for timing out, which would let
+    /// the original media event reach macOS.
+    private static let writeQueue = DispatchQueue(label: "com.airpodkit.debug-log")
 
     private static let formatter: DateFormatter = {
         let f = DateFormatter()
@@ -19,14 +21,23 @@ enum DebugLog {
     }()
 
     static func log(_ message: String) {
-        let line = "[\(formatter.string(from: Date()))] \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
-        if let handle = try? FileHandle(forWritingTo: fileURL) {
-            defer { try? handle.close() }
-            handle.seekToEndOfFile()
-            handle.write(data)
-        } else {
-            try? data.write(to: fileURL)
+        let timestamp = Date()
+        writeQueue.async {
+            let directory = fileURL.deletingLastPathComponent()
+            try? FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+
+            let line = "[\(formatter.string(from: timestamp))] \(message)\n"
+            guard let data = line.data(using: .utf8) else { return }
+            if let handle = try? FileHandle(forWritingTo: fileURL) {
+                defer { try? handle.close() }
+                handle.seekToEndOfFile()
+                handle.write(data)
+            } else {
+                try? data.write(to: fileURL)
+            }
         }
     }
 }

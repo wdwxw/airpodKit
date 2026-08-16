@@ -44,12 +44,13 @@ Shortcut / ModifierKey — the data model (see below).
 ShortcutStore        — Codable JSON in UserDefaults, ObservableObject.
 PermissionsManager   — polls + requests Accessibility / Input Monitoring.
 LaunchAtLoginManager — thin wrapper over SMAppService.mainApp.
-NowPlayingClaim      — claims MPRemoteCommandCenter/MPNowPlayingInfoCenter
-                        so macOS doesn't auto-launch Music.app (see below).
+NowPlayingClaim      — optional compatibility experiment; not activated by
+                        default because AirPodKit is not a media player and a
+                        global claim can steal ordinary media controls.
 DebugLog             — appends timestamped lines to
-                        ~/Library/Logs/AirPodKit/airpodkit.log; use this to
-                        debug button handling instead of stdout prints,
-                        since the app usually has no attached terminal.
+                        ~/Library/Logs/AirPodKit/airpodkit.log asynchronously;
+                        use this to debug button handling instead of stdout
+                        prints, since the app usually has no attached terminal.
 ```
 
 ### How button presses are captured
@@ -81,8 +82,10 @@ event still reached the system and triggered Play/Pause anyway, since
 macOS's default handling for that key type acts on the up transition. Fix:
 `RemoteButtonMonitor.onButtonPress` is now called for *both* halves
 (signature is `(RemoteButton, isDown: Bool) -> Bool`) and consumes both
-when mapped; `RemapEngine` only calls `KeystrokeSynthesizer.post` on the
-`isDown == true` call, to avoid firing the shortcut twice per press.
+when mapped. `RemapEngine` normally calls `KeystrokeSynthesizer.post` on
+down, then consumes up; if macOS delivers an up without a paired down, it
+synthesizes once on up as a fallback and tracks the press so a normal pair
+still fires only once.
 
 ✅ **Confirmed working against the user's real wired remote.** The
 throwaway diagnostic spike (`Spike/main.swift`, still present, unbuilt
@@ -188,12 +191,13 @@ our `CGEventTap` observes at all, so no amount of correctly consuming the
 tap's event will stop it — confirmed by `DebugLog` output showing every
 down/up correctly logged as `consumed` while Music still launched.
 
-First attempt (`NowPlayingClaim.swift`, called once from
-`RemapEngine.start()`): register a no-op `MPRemoteCommandCenter`
+First attempt (`NowPlayingClaim.swift`): register a no-op `MPRemoteCommandCenter`
 play/pause/toggle handler and publish minimal
 `MPNowPlayingInfoCenter.default().nowPlayingInfo`, hoping AirPodKit would
 become the "Now Playing" target macOS routes the key to. **This alone did
-not fix it.** Unified log around a real press showed the actual chain:
+not fix it. It is no longer activated by default because claiming Now Playing
+globally can steal ordinary media controls from real players. Unified log
+around a real press showed the actual chain:
 
 ```
 mediaremoted: Destination app com.apple.Music not available for command
@@ -209,16 +213,13 @@ did register (`canBeNowPlayingApplication=YES`), but `mediaremoted`'s
 anyway. Being *eligible* isn't the same as *winning* — there's no public
 API to force the win.
 
-Actual fix (`MusicLaunchGuard.swift`, also started from
-`RemapEngine.start()`): pragmatic and a bit blunt, but it's what actually
-works — observe `NSWorkspace.didLaunchApplicationNotification`, and if
-`com.apple.Music` launches within 2s of `RemapEngine` having just handled
-a mapped press (`MusicLaunchGuard.noteMappedPressHandled()` records the
-timestamp), `forceTerminate()` it immediately. Verified with the
-`fake_media_key` spike (fire a simulated press, manually `open -a Music`
-within the window, confirm it dies within ~1s). Keep `NowPlayingClaim`
-too — no reason to remove it, it's harmless and might help on some macOS
-versions/configurations even if it didn't here.
+Current fix (`MusicLaunchGuard.swift`, also started from
+`RemapEngine.start()`): use `NSWorkspace.willLaunchApplicationNotification`
+and, only after a mapped center press, terminate `com.apple.Music` or
+`com.apple.iTunes` before startup. The guard window is 1s and is cleared after
+one match, so an unrelated user launch is not killed later. This is still a
+fallback for the separate `rcd`/`mediaremoted` path; the actual replacement
+shortcut continues to come from `KeystrokeSynthesizer`.
 
 If a similar "we consumed it but X still happened" bug shows up again for
 some other system behavior, don't assume the fix must live in

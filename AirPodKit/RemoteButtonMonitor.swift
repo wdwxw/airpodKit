@@ -1,7 +1,7 @@
 import AppKit
 import ApplicationServices
 
-enum RemoteButton: String, CaseIterable, Codable {
+enum RemoteButton: String, CaseIterable, Codable, Hashable {
     case volumeUp
     case center
     case volumeDown
