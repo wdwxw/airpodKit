@@ -1,65 +1,138 @@
 # AirPodKit
 
-A macOS menu bar utility that remaps the three buttons on Apple's **wired**
-EarPods / AirPods-style remote — Volume Up, the center button, and Volume
-Down — into custom keyboard shortcuts.
+把 Apple 有线耳机线控按键变成 Mac 快捷键。
 
-<p align="center">
-  <em>音量加 → 中间键 → 音量减，和真实线控上的物理排列一致</em>
-</p>
+AirPodKit 是一个常驻 macOS 菜单栏的小工具，专门为 Apple 有线
+EarPods 及兼容的有线耳机线控设计。它可以把音量加、中间键、音量减
+分别替换成你指定的键盘按键或快捷键。
 
-## Features
+例如：
 
-- Remap **Volume Up**, the **center button**, and **Volume Down** to any
-  keyboard shortcut, individually.
-- Shortcuts can be a full combo (⌘⇧S, Return, ⌥→, ...) **or a single
-  modifier key by itself** (just ⌘, just ⌥, ...).
-- Left and right modifier keys are treated as distinct and labeled
-  explicitly (e.g. "左⌘" vs "右⌘") — left ⌘ and right ⌘ can be mapped to
-  different things.
-- Lives entirely in the menu bar — no Dock icon, no main window.
-- Launch at login, powered by `SMAppService` (no separate helper app).
-- Guides you through granting the two required macOS permissions
-  (Accessibility, Input Monitoring) automatically on launch until both are
-  granted.
+- 把中间键改成 `⌘⇧4`，按一下就截图；
+- 把中间键改成 `⌘K`，直接触发当前软件的快捷操作；
+- 把音量加改成一个单独的 `⌥`，把音量减改成 `⌘⇧M`。
 
-## How it works, in short
+## 按键行为
 
-Volume/media buttons on Apple's wired remotes surface through the same
-private system event stream macOS uses for keyboard media keys.
-AirPodKit installs a low-level event tap to detect those presses; if
-you've mapped a button, it blocks the original action (so your system
-volume doesn't jump) and sends your custom shortcut instead. Unmapped
-buttons behave exactly as before.
+| 耳机线控按键 | 可以设置为 | 没有设置时 |
+| --- | --- | --- |
+| 音量加 | 任意键或快捷键 | 系统音量加 |
+| 中间键 | 任意键或快捷键 | 系统播放/暂停 |
+| 音量减 | 任意键或快捷键 | 系统音量减 |
 
-Because of this, AirPodKit needs two permissions to work:
+设置映射后，AirPodKit 会拦截原来的音量或播放操作，只发送你设置的
+快捷键。中间键也不会再按系统默认行为启动 Music。
 
-- **Accessibility** — to intercept and replace the button press.
-- **Input Monitoring** — to see the button press at all.
+## 功能
 
-The app will prompt you for both the first time you open it, and again on
-future launches if either hasn't been granted yet.
+- 三个线控按键可以分别设置，互不影响。
+- 支持单个按键，例如 `Return`、`F1`、方向键。
+- 支持组合快捷键，例如 `⌘⇧S`、`⌥→`。
+- 支持单独的修饰键，例如只按一下 `⌘` 或 `⌥`。
+- 左右修饰键可以区分，例如左 `⌘` 和右 `⌘` 可以设置成不同动作。
+- 配置会自动保存到本机。
+- 可以设置为登录 macOS 后自动启动。
+- 只显示在菜单栏，不占用 Dock 图标或独立主窗口。
 
-## Requirements
+## 安装
 
-- macOS 13 Ventura or later
-- Apple wired EarPods / AirPods-style remote (Lightning, USB-C, or via the
-  3.5mm adapter)
+当前版本通过源码构建使用，暂未提供已签名、公证的安装包。
 
-## Building from source
+### 环境要求
+
+- macOS 13 Ventura 或更高版本；
+- Xcode 或可用的 macOS 编译环境；
+- Homebrew，用于安装 XcodeGen；
+- Apple 有线 EarPods、带线控的兼容耳机，或通过 3.5mm、Lightning、USB-C
+  连接的兼容线控设备。
+
+无线 AirPods 使用另一套蓝牙控制协议，目前不在支持范围内。
+
+### 从 GitHub 安装
 
 ```bash
-brew install xcodegen   # one-time
-git clone <this repo>
-cd airPodKit
+brew install xcodegen
+git clone https://github.com/wdwxw/airpodKit.git
+cd airpodKit
 ./build.sh --run
 ```
 
-This builds the app to `./build/AirPodKit.app` and launches it. See
-`CLAUDE.md` for architecture details if you want to dig into the code.
+构建完成后，应用位于：
 
-## Status
+```text
+build/AirPodKit.app
+```
 
-This is an actively developed personal utility, not yet notarized or
-signed for distribution outside this project's own build process. Grab
-the source and build it yourself for now.
+以后重新构建并启动，仍然执行：
+
+```bash
+./build.sh --run
+```
+
+## 首次启动：授予系统权限
+
+AirPodKit 需要以下两个 macOS 权限才能捕获并替换耳机按键：
+
+1. 打开 **系统设置 → 隐私与安全性 → 辅助功能**，允许 AirPodKit；
+2. 打开 **系统设置 → 隐私与安全性 → 输入监控**，允许 AirPodKit；
+3. 回到 AirPodKit，等待两个权限都显示为已授权。
+
+首次启动时，AirPodKit 会显示授权提示，并提供打开对应系统设置页面的按钮。
+如果授权后按键仍然没有反应，退出并重新打开 AirPodKit。
+
+## 使用方法
+
+### 1. 打开菜单栏设置
+
+启动 AirPodKit 后，点击菜单栏中的 AirPodKit 图标。
+
+### 2. 录制替换快捷键
+
+在“按键映射”区域找到要修改的按键：
+
+1. 点击右侧的“点按录制”；
+2. 按下想要设置的键或快捷键；
+3. 等待录制完成，设置会自动保存；
+4. 如果录制过程中想取消，按 `Esc`。
+
+### 3. 使用耳机按键
+
+完成设置后，直接按对应的耳机线控按键即可。快捷键会发送给当前正在使用的
+macOS 软件。
+
+### 4. 设置登录启动
+
+在菜单栏设置中打开“开机时启动”。之后登录 macOS 后，AirPodKit 会自动运行，
+无需每次手动打开。
+
+## 注意事项
+
+- AirPodKit 只处理单次按键，目前不支持中间键双击、三击或长按。
+- 没有设置映射的按键会保持 macOS 原本的行为。
+- AirPodKit 本身不播放音乐，也不控制指定音乐软件；它只负责捕获耳机按键并发送
+  键盘快捷键。
+- 当前版本是开发版，未经过 Apple Developer ID 签名和公证。首次运行时，macOS
+  可能需要你在“隐私与安全性”中确认允许运行。
+
+## 排查问题
+
+### 按键完全没有反应
+
+确认以下事项：
+
+- AirPodKit 正在运行，并且菜单栏中能看到图标；
+- “辅助功能”和“输入监控”两个权限都已开启；
+- 耳机是有线线控设备，而不是无线 AirPods；
+- 已经在对应按键右侧录制并保存了快捷键。
+
+确认后仍无效，可以退出 AirPodKit，再执行一次：
+
+```bash
+./build.sh --run
+```
+
+## 反馈与问题
+
+欢迎在 GitHub 提交问题或功能建议：
+
+[提交 Issue](https://github.com/wdwxw/airpodKit/issues)
