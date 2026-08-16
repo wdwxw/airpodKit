@@ -1,0 +1,617 @@
+<!--
+  PROTOTYPE — throwaway, not production code.
+  Three structurally different variants of the AirPods remap settings UI,
+  switchable via ?variant=A|B|C. Open this file directly in a browser.
+
+  A — Full-window "System Settings" grouped-list style
+  B — Full-window "Shortcuts app" card-grid style
+  C — Menu-bar "popover" compact style (the app's actual real-world container)
+-->
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AirPods 按键设置 — UI Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --sys-blue:#007AFF;
+    --sys-blue-dark:#0A84FF;
+    --bg-window:#ececec;
+    --bg-window-dark:#242427;
+    --bg-content:#ffffff;
+    --bg-content-dark:#1e1e20;
+    --bg-row:#ffffff;
+    --bg-row-dark:#2c2c2e;
+    --bg-row-hover:#f5f5f7;
+    --bg-row-hover-dark:#3a3a3c;
+    --text:#1d1d1f;
+    --text-dark:#f5f5f7;
+    --text-secondary:#6e6e73;
+    --text-secondary-dark:#98989d;
+    --separator:#e5e5e7;
+    --separator-dark:#3a3a3c;
+    --card-shadow:0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+    color-scheme: light;
+  }
+  html[data-theme="dark"]{ color-scheme: dark; }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background:var(--bg-window);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  html[data-theme="dark"] body{ background:var(--bg-window-dark); color:var(--text-dark); }
+
+  .stage{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:48px 20px 120px;
+  }
+
+  /* ---------- shared bits ---------- */
+  .menubar-icon{
+    width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;
+  }
+  .kbd-chip{
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:26px; height:26px; padding:0 6px;
+    border-radius:6px;
+    background:var(--bg-row-hover);
+    border:1px solid var(--separator);
+    font-size:13px; font-weight:600;
+    color:var(--text);
+  }
+  html[data-theme="dark"] .kbd-chip{ background:var(--bg-row-hover-dark); border-color:var(--separator-dark); color:var(--text-dark); }
+  .kbd-chip.accent{ background:var(--sys-blue); border-color:var(--sys-blue); color:#fff; }
+  .plus{ color:var(--text-secondary); font-size:12px; margin:0 2px; }
+
+  /* toggle switch */
+  .switch{
+    position:relative; width:38px; height:22px; border-radius:999px;
+    background:#d1d1d6; cursor:pointer; transition:background .15s ease; flex:none;
+    border:none; padding:0;
+  }
+  html[data-theme="dark"] .switch{ background:#48484a; }
+  .switch.on{ background:var(--sys-blue); }
+  html[data-theme="dark"] .switch.on{ background:var(--sys-blue-dark); }
+  .switch .knob{
+    position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%;
+    background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.3); transition:left .15s ease;
+  }
+  .switch.on .knob{ left:18px; }
+
+  /* recorder field */
+  .recorder{
+    display:flex; align-items:center; gap:4px; min-height:30px; padding:4px 10px;
+    border-radius:7px; border:1px solid var(--separator); background:var(--bg-row-hover);
+    cursor:pointer; font-size:13px; color:var(--text-secondary); user-select:none;
+    transition:box-shadow .1s ease, border-color .1s ease;
+  }
+  html[data-theme="dark"] .recorder{ border-color:var(--separator-dark); background:var(--bg-row-hover-dark); }
+  .recorder.recording{
+    border-color:var(--sys-blue); color:var(--sys-blue);
+    box-shadow:0 0 0 3px rgba(0,122,255,.18);
+  }
+  .recorder .placeholder{ font-style:normal; }
+
+  section.variant{ display:none; width:100%; }
+  section.variant.active{ display:flex; justify-content:center; }
+
+  /* =========================================================
+     VARIANT A — System Settings grouped-list style
+     ========================================================= */
+  .winA{
+    width:640px; max-width:100%;
+    background:var(--bg-content);
+    border-radius:12px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    overflow:hidden;
+  }
+  html[data-theme="dark"] .winA{ background:var(--bg-content-dark); }
+  .winA .titlebar{
+    height:52px; display:flex; align-items:center; gap:10px; padding:0 16px;
+    border-bottom:1px solid var(--separator); background:var(--bg-window);
+  }
+  html[data-theme="dark"] .winA .titlebar{ border-color:var(--separator-dark); background:#2a2a2c; }
+  .traffic{ display:flex; gap:8px; }
+  .traffic span{ width:12px;height:12px;border-radius:50%; }
+  .traffic .r{ background:#ff5f57;} .traffic .y{background:#febc2e;} .traffic .g{background:#28c840;}
+  .winA .titlebar .app-title{ font-size:13px; font-weight:600; margin:0 auto; transform:translateX(-24px); }
+
+  .winA .hero{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    padding:28px 20px 22px;
+  }
+  .hero-icon{
+    width:64px; height:64px; border-radius:16px;
+    background:linear-gradient(160deg,#3ea6ff,#0a5fd6);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(10,95,214,.35);
+  }
+  .hero-title{ font-size:15px; font-weight:600; }
+  .hero-sub{ font-size:12px; color:var(--text-secondary); }
+
+  .groupA{ margin:0 20px 22px; }
+  .groupA .group-label{
+    font-size:11px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--text-secondary); margin:0 0 6px 12px;
+  }
+  .groupA .rows{
+    background:var(--bg-row); border-radius:10px; overflow:hidden;
+    box-shadow:var(--card-shadow);
+  }
+  html[data-theme="dark"] .groupA .rows{ background:var(--bg-row-dark); }
+  .rowA{
+    display:flex; align-items:center; gap:12px; padding:11px 14px;
+    border-bottom:1px solid var(--separator);
+  }
+  html[data-theme="dark"] .rowA{ border-color:var(--separator-dark); }
+  .rowA:last-child{ border-bottom:none; }
+  .rowA .icon{
+    width:28px;height:28px;border-radius:7px; display:flex;align-items:center;justify-content:center;
+    color:#fff; font-size:14px; flex:none;
+  }
+  .rowA .icon.up{ background:#34c759; }
+  .rowA .icon.down{ background:#ff9500; }
+  .rowA .icon.mid{ background:#af52de; }
+  .rowA .label{ flex:1; font-size:13px; }
+  .rowA .label .sub{ display:block; font-size:11px; color:var(--text-secondary); margin-top:1px; }
+  .rowA .recorder{ min-width:150px; justify-content:center; }
+
+  .rowA.login{ }
+  .rowA.login .label b{ font-weight:600; }
+
+  /* =========================================================
+     VARIANT B — Shortcuts-app card grid style
+     ========================================================= */
+  .winB{
+    width:760px; max-width:100%;
+    background:var(--bg-content);
+    border-radius:12px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    overflow:hidden;
+  }
+  html[data-theme="dark"] .winB{ background:var(--bg-content-dark); }
+  .winB .toolbar{
+    display:flex; align-items:center; gap:10px; padding:14px 20px;
+    border-bottom:1px solid var(--separator); background:var(--bg-window);
+  }
+  html[data-theme="dark"] .winB .toolbar{ border-color:var(--separator-dark); background:#2a2a2c; }
+  .winB .toolbar .title{ font-size:16px; font-weight:700; margin-left:4px; }
+  .winB .toolbar .app-icon{
+    width:26px;height:26px;border-radius:7px;
+    background:linear-gradient(160deg,#3ea6ff,#0a5fd6);
+  }
+
+  .cardsB{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:16px;
+    padding:24px;
+  }
+  .cardB{
+    border-radius:14px; padding:18px 16px; text-align:center;
+    background:var(--bg-row); box-shadow:var(--card-shadow);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  html[data-theme="dark"] .cardB{ background:var(--bg-row-dark); }
+  .cardB .badge{
+    width:44px;height:44px;border-radius:12px;color:#fff;font-size:19px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .cardB .badge.up{ background:#34c759; }
+  .cardB .badge.down{ background:#ff9500; }
+  .cardB .badge.mid{ background:#af52de; }
+  .cardB .name{ font-size:13px; font-weight:600; }
+  .cardB .desc{ font-size:11px; color:var(--text-secondary); margin-top:-6px; }
+  .cardB .recorder{ width:100%; justify-content:center; margin-top:4px; }
+  .cardB .modrow{ display:flex; gap:6px; margin-top:2px; flex-wrap:wrap; justify-content:center; }
+  .mod-toggle{
+    font-size:11px; padding:4px 8px; border-radius:999px;
+    border:1px solid var(--separator); background:transparent; color:var(--text-secondary);
+    cursor:pointer;
+  }
+  html[data-theme="dark"] .mod-toggle{ border-color:var(--separator-dark); color:var(--text-secondary-dark); }
+  .mod-toggle.active{ background:var(--sys-blue); border-color:var(--sys-blue); color:#fff; }
+
+  .footerB{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; border-top:1px solid var(--separator);
+  }
+  html[data-theme="dark"] .footerB{ border-color:var(--separator-dark); }
+  .footerB .label{ font-size:13px; }
+  .footerB .label .sub{ display:block; font-size:11px; color:var(--text-secondary); }
+
+  /* =========================================================
+     VARIANT C — Menu-bar popover (compact, real container)
+     ========================================================= */
+  .stageC{ display:flex; flex-direction:column; align-items:flex-end; width:340px; max-width:100%; }
+  .menubar-callout{
+    align-self:flex-end; margin:0 26px 6px 0;
+    background:#ff3b30; color:#fff; font-size:11px; font-weight:600;
+    padding:4px 8px; border-radius:6px; font-family:-apple-system,sans-serif;
+    box-shadow:0 2px 6px rgba(0,0,0,.25);
+  }
+  .menubar-strip{
+    width:100%; height:26px; background:rgba(246,246,246,.85);
+    backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--separator);
+    display:flex; align-items:center; justify-content:flex-end; padding:0 10px; gap:14px;
+    font-size:12px; color:#1d1d1f;
+  }
+  html[data-theme="dark"] .menubar-strip{ background:rgba(30,30,32,.85); border-color:var(--separator-dark); color:#f5f5f7; }
+  .menubar-strip .mi{ opacity:.8; }
+  .menubar-strip .mi.active{ opacity:1; background:rgba(0,0,0,.08); border-radius:5px; padding:2px 5px; }
+  html[data-theme="dark"] .menubar-strip .mi.active{ background:rgba(255,255,255,.14); }
+
+  .popoverC{
+    width:300px; margin-top:2px; margin-right:8px;
+    background:rgba(246,246,246,.92);
+    backdrop-filter:blur(24px);
+    border-radius:12px;
+    box-shadow:0 12px 40px rgba(0,0,0,.3);
+    border:1px solid rgba(0,0,0,.06);
+    overflow:hidden;
+    position:relative;
+  }
+  html[data-theme="dark"] .popoverC{ background:rgba(40,40,42,.9); border-color:rgba(255,255,255,.08); }
+  .popoverC:before{
+    content:""; position:absolute; top:-7px; right:16px; width:14px; height:14px;
+    background:inherit; transform:rotate(45deg); border-radius:2px;
+  }
+  .popoverC .headC{
+    padding:12px 14px 8px; font-size:12px; font-weight:700; color:var(--text-secondary);
+    text-transform:uppercase; letter-spacing:.05em;
+  }
+  html[data-theme="dark"] .popoverC .headC{ color:var(--text-secondary-dark); }
+  .rowC{
+    display:flex; align-items:center; gap:10px; padding:8px 14px;
+  }
+  .rowC .icon-glyph{
+    width:18px; height:18px; flex:none; display:flex; align-items:center; justify-content:center;
+    color:var(--text-secondary);
+  }
+  html[data-theme="dark"] .rowC .icon-glyph{ color:var(--text-secondary-dark); }
+  .rowC .icon-glyph svg{ width:17px; height:17px; }
+  .rowC .label{ font-size:12.5px; flex:1; }
+  .rowC .recorder{ min-height:22px; padding:2px 8px; font-size:11.5px; min-width:110px; justify-content:center; }
+  .rowC .kbd-chip{ min-width:20px; height:20px; font-size:11px; }
+
+  .sepC{ height:1px; background:var(--separator); margin:6px 0; }
+  html[data-theme="dark"] .sepC{ background:var(--separator-dark); }
+
+  .rowC.loginC .label b{ font-weight:600; }
+  .footC{ padding:6px 14px 12px; }
+  .quitC{
+    width:100%; text-align:left; background:none; border:none; padding:6px 4px;
+    font-size:12.5px; color:var(--text); cursor:pointer; border-radius:6px;
+  }
+  .quitC:hover{ background:rgba(0,0,0,.06); }
+  html[data-theme="dark"] .quitC{ color:var(--text-dark); }
+  html[data-theme="dark"] .quitC:hover{ background:rgba(255,255,255,.08); }
+
+  /* ---------- prototype switcher (not part of the design) ---------- */
+  .proto-bar{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:10px;
+    background:#111; color:#fff; border-radius:999px;
+    padding:8px 10px 8px 14px; box-shadow:0 8px 24px rgba(0,0,0,.35);
+    font-family:-apple-system,sans-serif; font-size:12.5px; z-index:1000;
+  }
+  .proto-bar button{
+    background:#2a2a2a; color:#fff; border:none; width:26px; height:26px; border-radius:50%;
+    cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;
+  }
+  .proto-bar button:hover{ background:#3a3a3a; }
+  .proto-bar .theme-btn{ width:auto; border-radius:999px; padding:0 10px; font-size:11px; }
+  .proto-bar .vlabel{ min-width:180px; text-align:center; opacity:.9; }
+  .proto-hint{
+    position:fixed; top:14px; left:50%; transform:translateX(-50%);
+    background:rgba(17,17,17,.85); color:#fff; font-size:11.5px; padding:6px 12px;
+    border-radius:8px; font-family:-apple-system,sans-serif; z-index:1000;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-hint">PROTOTYPE — throwaway. 三个方案切换预览，非最终实现。</div>
+
+<div class="stage">
+
+  <!-- ===================== VARIANT A ===================== -->
+  <section class="variant" data-variant="A">
+    <div class="winA">
+      <div class="titlebar">
+        <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <div class="app-title">AirPods 按键</div>
+      </div>
+      <div class="hero">
+        <div class="hero-icon">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M7 3a4 4 0 0 1 4 4v9a3 3 0 1 1-3-3h1V7a2 2 0 0 0-4 0v3H3V7a4 4 0 0 1 4-4Z" fill="#fff"/><path d="M17 3a4 4 0 0 0-4 4v9a3 3 0 1 0 3-3h-1V7a2 2 0 0 1 4 0v3h2V7a4 4 0 0 0-4-4Z" fill="#fff" opacity=".85"/></svg>
+        </div>
+        <div class="hero-title">AirPods 有线耳机按键设置</div>
+        <div class="hero-sub">为「音量加」「音量减」「中间键」分配自定义快捷键</div>
+      </div>
+
+      <div class="groupA">
+        <div class="group-label">按键映射</div>
+        <div class="rows">
+          <div class="rowA">
+            <div class="icon up">＋</div>
+            <div class="label">音量加<span class="sub">短按</span></div>
+            <div class="recorder" data-key="volup" tabindex="0">
+              <span class="chips"></span><span class="placeholder">点按录制快捷键</span>
+            </div>
+          </div>
+          <div class="rowA">
+            <div class="icon down">－</div>
+            <div class="label">音量减<span class="sub">短按</span></div>
+            <div class="recorder" data-key="voldown" tabindex="0">
+              <span class="chips"></span><span class="placeholder">点按录制快捷键</span>
+            </div>
+          </div>
+          <div class="rowA">
+            <div class="icon mid">●</div>
+            <div class="label">中间键<span class="sub">单击</span></div>
+            <div class="recorder" data-key="middle" tabindex="0">
+              <span class="chips"></span><span class="placeholder">点按录制快捷键</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="groupA">
+        <div class="group-label">通用</div>
+        <div class="rows">
+          <div class="rowA login">
+            <div class="icon" style="background:#8e8e93;">⏻</div>
+            <div class="label"><b>开机时启动</b><span class="sub">登录后自动在菜单栏运行</span></div>
+            <button class="switch on" data-toggle="login-a"><span class="knob"></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VARIANT B ===================== -->
+  <section class="variant" data-variant="B">
+    <div class="winB">
+      <div class="toolbar">
+        <div class="app-icon"></div>
+        <div class="title">AirPods 按键</div>
+      </div>
+      <div class="cardsB">
+        <div class="cardB">
+          <div class="badge up">＋</div>
+          <div class="name">音量加</div>
+          <div class="desc">短按上键</div>
+          <div class="recorder" data-key="volup2"><span class="chips"></span><span class="placeholder">录制…</span></div>
+          <div class="modrow">
+            <button class="mod-toggle" data-mod="⌘">⌘</button>
+            <button class="mod-toggle" data-mod="⇧">⇧</button>
+            <button class="mod-toggle" data-mod="⌥">⌥</button>
+            <button class="mod-toggle" data-mod="⌃">⌃</button>
+            <button class="mod-toggle" data-mod="↩">↩</button>
+          </div>
+        </div>
+        <div class="cardB">
+          <div class="badge down">－</div>
+          <div class="name">音量减</div>
+          <div class="desc">短按下键</div>
+          <div class="recorder" data-key="voldown2"><span class="chips"></span><span class="placeholder">录制…</span></div>
+          <div class="modrow">
+            <button class="mod-toggle" data-mod="⌘">⌘</button>
+            <button class="mod-toggle" data-mod="⇧">⇧</button>
+            <button class="mod-toggle" data-mod="⌥">⌥</button>
+            <button class="mod-toggle" data-mod="⌃">⌃</button>
+            <button class="mod-toggle" data-mod="↩">↩</button>
+          </div>
+        </div>
+        <div class="cardB">
+          <div class="badge mid">●</div>
+          <div class="name">中间键</div>
+          <div class="desc">单击</div>
+          <div class="recorder" data-key="middle2"><span class="chips"></span><span class="placeholder">录制…</span></div>
+          <div class="modrow">
+            <button class="mod-toggle" data-mod="⌘">⌘</button>
+            <button class="mod-toggle" data-mod="⇧">⇧</button>
+            <button class="mod-toggle" data-mod="⌥">⌥</button>
+            <button class="mod-toggle" data-mod="⌃">⌃</button>
+            <button class="mod-toggle" data-mod="↩">↩</button>
+          </div>
+        </div>
+      </div>
+      <div class="footerB">
+        <div class="label">开机时启动<span class="sub">登录后自动在菜单栏运行</span></div>
+        <button class="switch on" data-toggle="login-b"><span class="knob"></span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VARIANT C ===================== -->
+  <section class="variant" data-variant="C">
+    <div class="stageC">
+      <div class="menubar-callout">↓ 这是菜单栏图标（真实系统里会更清晰、可点击）</div>
+      <div class="menubar-strip">
+        <span class="mi">📶</span><span class="mi">🔋</span><span class="mi">🔊</span>
+        <span class="mi active menubar-icon">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3a4 4 0 0 1 4 4v9a3 3 0 1 1-3-3h1V7a2 2 0 0 0-4 0v3H3V7a4 4 0 0 1 4-4Z"/><path d="M17 3a4 4 0 0 0-4 4v9a3 3 0 1 0 3-3h-1V7a2 2 0 0 1 4 0v3h2V7a4 4 0 0 0-4-4Z" opacity=".85"/></svg>
+        </span>
+        <span class="mi">17:42</span>
+      </div>
+      <div class="popoverC">
+        <div class="headC">按键映射</div>
+        <div class="rowC">
+          <span class="icon-glyph">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3.2L11 18V6L6.2 10H3Z" fill="currentColor"/><path d="M12.5 9a4 4 0 0 1 0 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M15 7a8 8 0 0 1 0 10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M17.5 5a12 12 0 0 1 0 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </span>
+          <span class="label">音量加</span>
+          <div class="recorder" data-key="volup3"><span class="chips"></span><span class="placeholder">录制</span></div>
+        </div>
+        <div class="rowC">
+          <span class="icon-glyph">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+          </span>
+          <span class="label">中间键</span>
+          <div class="recorder" data-key="middle3"><span class="chips"></span><span class="placeholder">录制</span></div>
+        </div>
+        <div class="rowC">
+          <span class="icon-glyph">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 10v4h3.2L11 18V6L6.2 10H3Z" fill="currentColor"/></svg>
+          </span>
+          <span class="label">音量减</span>
+          <div class="recorder" data-key="voldown3"><span class="chips"></span><span class="placeholder">录制</span></div>
+        </div>
+        <div class="sepC"></div>
+        <div class="rowC loginC">
+          <span class="label"><b>开机时启动</b></span>
+          <button class="switch on" data-toggle="login-c"><span class="knob"></span></button>
+        </div>
+        <div class="sepC"></div>
+        <div class="footC">
+          <button class="quitC">退出 AirPods 按键</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="proto-bar">
+  <button id="prevBtn" title="上一个 (←)">‹</button>
+  <span class="vlabel" id="vlabel">A — System Settings 分组列表</span>
+  <button id="nextBtn" title="下一个 (→)">›</button>
+  <button class="theme-btn" id="themeBtn">☾ Dark</button>
+</div>
+
+<script>
+(function(){
+  var VARIANTS = [
+    {key:'A', name:'System Settings 分组列表'},
+    {key:'B', name:'Shortcuts 卡片网格'},
+    {key:'C', name:'菜单栏 Popover（真实容器）'}
+  ];
+
+  function getParam(){
+    var p = new URLSearchParams(location.search).get('variant');
+    return VARIANTS.some(v=>v.key===p) ? p : 'C';
+  }
+  function setParam(key){
+    var url = new URL(location.href);
+    url.searchParams.set('variant', key);
+    history.replaceState(null, '', url);
+    render();
+  }
+  function idx(key){ return VARIANTS.findIndex(v=>v.key===key); }
+
+  function render(){
+    var key = getParam();
+    document.querySelectorAll('.variant').forEach(function(el){
+      el.classList.toggle('active', el.dataset.variant === key);
+    });
+    var v = VARIANTS[idx(key)];
+    document.getElementById('vlabel').textContent = v.key + ' — ' + v.name;
+  }
+
+  document.getElementById('prevBtn').addEventListener('click', function(){
+    var i = idx(getParam()); i = (i-1+VARIANTS.length)%VARIANTS.length;
+    setParam(VARIANTS[i].key);
+  });
+  document.getElementById('nextBtn').addEventListener('click', function(){
+    var i = idx(getParam()); i = (i+1)%VARIANTS.length;
+    setParam(VARIANTS[i].key);
+  });
+  document.addEventListener('keydown', function(e){
+    var tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) return;
+    if (e.key === 'ArrowLeft') document.getElementById('prevBtn').click();
+    if (e.key === 'ArrowRight') document.getElementById('nextBtn').click();
+  });
+
+  // theme toggle (prototype-only helper)
+  var themeBtn = document.getElementById('themeBtn');
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    themeBtn.textContent = t === 'dark' ? '☀ Light' : '☾ Dark';
+  }
+  var theme = 'light';
+  applyTheme(theme);
+  themeBtn.addEventListener('click', function(){
+    theme = theme === 'light' ? 'dark' : 'light';
+    applyTheme(theme);
+  });
+
+  // toggle switches
+  document.querySelectorAll('.switch').forEach(function(sw){
+    sw.addEventListener('click', function(){ sw.classList.toggle('on'); });
+  });
+
+  // mod chip toggles (variant B)
+  document.querySelectorAll('.mod-toggle').forEach(function(btn){
+    btn.addEventListener('click', function(){ btn.classList.toggle('active'); });
+  });
+
+  // shortcut recorder — real keydown capture
+  var MOD_SYMBOLS = { metaKey:'⌘', shiftKey:'⇧', altKey:'⌥', ctrlKey:'⌃' };
+  document.querySelectorAll('.recorder').forEach(function(rec){
+    rec.addEventListener('click', function(){
+      document.querySelectorAll('.recorder.recording').forEach(function(r){
+        if (r !== rec) stopRecording(r, false);
+      });
+      startRecording(rec);
+    });
+  });
+
+  function startRecording(rec){
+    rec.classList.add('recording');
+    var ph = rec.querySelector('.placeholder');
+    if (ph) ph.textContent = '按下按键组合…';
+    var onKey = function(e){
+      e.preventDefault();
+      if (e.key === 'Escape'){ stopRecording(rec, false); return; }
+      var mods = [];
+      if (e.metaKey) mods.push('⌘');
+      if (e.ctrlKey) mods.push('⌃');
+      if (e.altKey) mods.push('⌥');
+      if (e.shiftKey) mods.push('⇧');
+      var mainKey = e.key;
+      if (['Meta','Control','Alt','Shift'].indexOf(mainKey) !== -1) return; // wait for a real key
+      if (mainKey === 'Enter') mainKey = '↩';
+      else if (mainKey === ' ') mainKey = 'Space';
+      else if (mainKey.length === 1) mainKey = mainKey.toUpperCase();
+      renderChips(rec, mods.concat([mainKey]));
+      stopRecording(rec, true);
+    };
+    rec._onKey = onKey;
+    document.addEventListener('keydown', onKey, true);
+  }
+  function stopRecording(rec, keepValue){
+    rec.classList.remove('recording');
+    if (rec._onKey){ document.removeEventListener('keydown', rec._onKey, true); rec._onKey = null; }
+    var ph = rec.querySelector('.placeholder');
+    var chips = rec.querySelector('.chips');
+    if (!keepValue && chips.children.length === 0 && ph) ph.textContent = '点按录制快捷键';
+  }
+  function renderChips(rec, parts){
+    var chips = rec.querySelector('.chips');
+    var ph = rec.querySelector('.placeholder');
+    if (ph) ph.style.display = 'none';
+    chips.innerHTML = '';
+    parts.forEach(function(p, i){
+      var c = document.createElement('span');
+      c.className = 'kbd-chip accent';
+      c.textContent = p;
+      chips.appendChild(c);
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
