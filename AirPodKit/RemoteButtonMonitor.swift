@@ -119,9 +119,17 @@ final class RemoteButtonMonitor {
         default: button = nil
         }
 
+        if let button {
+            DebugLog.log("saw NX_SYSDEFINED keyType=\(keyType) button=\(button) isDown=\(isDown)")
+        }
+
         guard let button, let onButtonPress, onButtonPress(button, isDown) else {
+            if let button {
+                DebugLog.log("  -> not consumed (no mapping or no handler) for \(button)")
+            }
             return Unmanaged.passUnretained(event)
         }
+        DebugLog.log("  -> consumed for \(button)")
         return nil
     }
 }
