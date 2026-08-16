@@ -44,6 +44,12 @@ Shortcut / ModifierKey — the data model (see below).
 ShortcutStore        — Codable JSON in UserDefaults, ObservableObject.
 PermissionsManager   — polls + requests Accessibility / Input Monitoring.
 LaunchAtLoginManager — thin wrapper over SMAppService.mainApp.
+NowPlayingClaim      — claims MPRemoteCommandCenter/MPNowPlayingInfoCenter
+                        so macOS doesn't auto-launch Music.app (see below).
+DebugLog             — appends timestamped lines to
+                        ~/Library/Logs/AirPodKit/airpodkit.log; use this to
+                        debug button handling instead of stdout prints,
+                        since the app usually has no attached terminal.
 ```
 
 ### How button presses are captured
@@ -170,6 +176,31 @@ this order: (a) is `RemoteButtonMonitor.eventTap` actually non-nil and
 process from before a signing-identity change looks identical from the
 Dock/menu bar); (c) is it signed with the stable local identity, not
 ad-hoc — see Signing below.
+
+### The "consumed the event but Music.app still launches" trap
+
+Consuming the `NX_SYSDEFINED` event (both down and up, correctly) is
+**not enough** to stop the center button from launching Music.app. macOS
+has a separate fallback: if a Play/Pause-type key is pressed and nothing
+has claimed "Now Playing" status, it auto-launches the system default
+media app. That fallback does not go through the `NX_SYSDEFINED` stream
+our `CGEventTap` observes at all, so no amount of correctly consuming the
+tap's event will stop it — confirmed by `DebugLog` output showing every
+down/up correctly logged as `consumed` while Music still launched.
+
+Fix (`NowPlayingClaim.swift`, called once from `RemapEngine.start()`):
+register a no-op `MPRemoteCommandCenter` play/pause/toggle handler and
+publish minimal `MPNowPlayingInfoCenter.default().nowPlayingInfo`, so
+AirPodKit itself becomes the "Now Playing" target macOS routes the key to
+— leaving nothing for it to fall back to launching. This needed
+`MediaPlayer.framework` added to `project.yml`'s dependencies.
+
+If a similar "we consumed it but X still happened" bug shows up again for
+some other system behavior, don't assume the fix must live in
+`RemoteButtonMonitor`/the CGEventTap — check whether it's a *different*
+system fallback path first (this is now the second time it's been a
+separate mechanism entirely: first the menu-bar-icon-not-showing dead
+end below, now this).
 
 ## "Menu bar icon doesn't show up" — usually not our bug
 
