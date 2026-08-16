@@ -15,6 +15,8 @@ enum RemapEngine {
     static func start() {
         DebugLog.log("=== AirPodKit launched (pid \(ProcessInfo.processInfo.processIdentifier)) ===")
 
+        NowPlayingClaim.activate()
+
         RemoteButtonMonitor.shared.onButtonPress = { button, isDown in
             guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
                 DebugLog.log("RemapEngine: \(button) has no mapping, letting default behavior happen")
