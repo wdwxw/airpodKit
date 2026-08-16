@@ -101,7 +101,12 @@ final class RecorderNSView: NSView {
         // Only react to the key-down transition of this specific side; the
         // matching key-up transition is what lets a solo tap register (see
         // capturedModifiers doc comment) so it's intentionally ignored here.
-        let isDown = (event.modifierFlags.rawValue & Self.deviceMask(for: modifier)) != 0
+        let isDown: Bool
+        if modifier == .function {
+            isDown = event.modifierFlags.contains(.function)
+        } else {
+            isDown = (event.modifierFlags.rawValue & Self.deviceMask(for: modifier)) != 0
+        }
         guard isDown else { return }
 
         capturedModifiers.insert(modifier)
@@ -159,6 +164,7 @@ final class RecorderNSView: NSView {
     /// of NSEvent.modifierFlags.rawValue that distinguishes left/right.
     private static func deviceMask(for modifier: ModifierKey) -> UInt {
         switch modifier {
+        case .function: return 0 // Function uses NSEvent.ModifierFlags.function.
         case .leftControl: return 0x0000_0001
         case .rightControl: return 0x0000_2000
         case .leftShift: return 0x0000_0002
