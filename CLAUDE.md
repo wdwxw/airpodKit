@@ -188,19 +188,46 @@ our `CGEventTap` observes at all, so no amount of correctly consuming the
 tap's event will stop it — confirmed by `DebugLog` output showing every
 down/up correctly logged as `consumed` while Music still launched.
 
-Fix (`NowPlayingClaim.swift`, called once from `RemapEngine.start()`):
-register a no-op `MPRemoteCommandCenter` play/pause/toggle handler and
-publish minimal `MPNowPlayingInfoCenter.default().nowPlayingInfo`, so
-AirPodKit itself becomes the "Now Playing" target macOS routes the key to
-— leaving nothing for it to fall back to launching. This needed
-`MediaPlayer.framework` added to `project.yml`'s dependencies.
+First attempt (`NowPlayingClaim.swift`, called once from
+`RemapEngine.start()`): register a no-op `MPRemoteCommandCenter`
+play/pause/toggle handler and publish minimal
+`MPNowPlayingInfoCenter.default().nowPlayingInfo`, hoping AirPodKit would
+become the "Now Playing" target macOS routes the key to. **This alone did
+not fix it.** Unified log around a real press showed the actual chain:
+
+```
+mediaremoted: Destination app com.apple.Music not available for command
+<...TogglePlayPause..., SenderBundleIdentifier = <com.apple.rcd>, ...>,
+and command requested a launch.
+```
+
+`com.apple.rcd` (Remote Control Daemon) parses the raw hardware report
+and sends the `TogglePlayPause` command straight to `mediaremoted` —
+`AirPodKit`'s own log confirms the `MPRemoteCommandCenter` registration
+did register (`canBeNowPlayingApplication=YES`), but `mediaremoted`'s
+(undocumented) arbitration for "who gets this command" still picked Music
+anyway. Being *eligible* isn't the same as *winning* — there's no public
+API to force the win.
+
+Actual fix (`MusicLaunchGuard.swift`, also started from
+`RemapEngine.start()`): pragmatic and a bit blunt, but it's what actually
+works — observe `NSWorkspace.didLaunchApplicationNotification`, and if
+`com.apple.Music` launches within 2s of `RemapEngine` having just handled
+a mapped press (`MusicLaunchGuard.noteMappedPressHandled()` records the
+timestamp), `forceTerminate()` it immediately. Verified with the
+`fake_media_key` spike (fire a simulated press, manually `open -a Music`
+within the window, confirm it dies within ~1s). Keep `NowPlayingClaim`
+too — no reason to remove it, it's harmless and might help on some macOS
+versions/configurations even if it didn't here.
 
 If a similar "we consumed it but X still happened" bug shows up again for
 some other system behavior, don't assume the fix must live in
-`RemoteButtonMonitor`/the CGEventTap — check whether it's a *different*
-system fallback path first (this is now the second time it's been a
-separate mechanism entirely: first the menu-bar-icon-not-showing dead
-end below, now this).
+`RemoteButtonMonitor`/the CGEventTap — check the unified log
+(`log show --predicate 'process == "AirPodKit"'` and also
+`process == "mediaremoted"` etc.) for what's *actually* generating the
+unwanted behavior before touching code. This is now the second time it's
+been a separate system mechanism entirely: first the
+menu-bar-icon-not-showing dead end below, now this.
 
 ## "Menu bar icon doesn't show up" — usually not our bug
 
