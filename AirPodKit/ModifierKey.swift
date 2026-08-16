@@ -6,6 +6,7 @@ import CoreGraphics
 /// collapse both sides into one bit, so telling them apart requires reading
 /// the actual key code from a `flagsChanged` event instead.
 enum ModifierKey: String, CaseIterable, Codable, Hashable {
+    case function
     case leftControl, rightControl
     case leftOption, rightOption
     case leftShift, rightShift
@@ -15,6 +16,7 @@ enum ModifierKey: String, CaseIterable, Codable, Hashable {
     /// changed.
     init?(keyCode: UInt16) {
         switch Int(keyCode) {
+        case kVK_Function: self = .function
         case kVK_Control: self = .leftControl
         case kVK_RightControl: self = .rightControl
         case kVK_Option: self = .leftOption
@@ -32,6 +34,7 @@ enum ModifierKey: String, CaseIterable, Codable, Hashable {
     /// base key).
     var virtualKeyCode: CGKeyCode {
         switch self {
+        case .function: return CGKeyCode(kVK_Function)
         case .leftControl: return CGKeyCode(kVK_Control)
         case .rightControl: return CGKeyCode(kVK_RightControl)
         case .leftOption: return CGKeyCode(kVK_Option)
@@ -49,6 +52,7 @@ enum ModifierKey: String, CaseIterable, Codable, Hashable {
     /// which not all apps honor, so combos use the generic mask.
     var comboFlag: CGEventFlags {
         switch self {
+        case .function: return .maskSecondaryFn
         case .leftControl, .rightControl: return .maskControl
         case .leftOption, .rightOption: return .maskAlternate
         case .leftShift, .rightShift: return .maskShift
@@ -60,6 +64,7 @@ enum ModifierKey: String, CaseIterable, Codable, Hashable {
     /// was recorded, not just which modifier.
     var displayLabel: String {
         switch self {
+        case .function: return "Fn"
         case .leftControl: return "左⌃"
         case .rightControl: return "右⌃"
         case .leftOption: return "左⌥"
@@ -73,6 +78,7 @@ enum ModifierKey: String, CaseIterable, Codable, Hashable {
 
     /// Stable display ordering, matching macOS convention ⌃⌥⇧⌘.
     static let displayOrder: [ModifierKey] = [
+        .function,
         .leftControl, .rightControl,
         .leftOption, .rightOption,
         .leftShift, .rightShift,

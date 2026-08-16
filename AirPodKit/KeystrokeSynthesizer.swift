@@ -1,9 +1,14 @@
 import CoreGraphics
+import Carbon.HIToolbox
 
 enum KeystrokeSynthesizer {
     static func post(_ shortcut: Shortcut) {
         switch shortcut {
         case .modifierOnly(let modifier):
+            if modifier == .function {
+                postFunctionModifier()
+                return
+            }
             // A modifier key's own press/release is reported as
             // flagsChanged, not keyDown/keyUp — the *only* signal of
             // "which modifier, held or released" is the `flags` field
@@ -17,6 +22,19 @@ enum KeystrokeSynthesizer {
             for modifier in modifiers { flags.insert(modifier.comboFlag) }
             postKey(keyCode, downFlags: flags, upFlags: flags)
         }
+    }
+
+    private static func postFunctionModifier() {
+        let source = CGEventSource(stateID: .hidSystemState)
+        guard let event = CGEvent(source: source) else { return }
+
+        event.type = .flagsChanged
+        event.setIntegerValueField(.keyboardEventKeycode, value: Int64(kVK_Function))
+        event.flags = [.maskSecondaryFn]
+        event.post(tap: .cghidEventTap)
+
+        event.flags = []
+        event.post(tap: .cghidEventTap)
     }
 
     private static func postKey(_ keyCode: CGKeyCode, downFlags: CGEventFlags, upFlags: CGEventFlags) {

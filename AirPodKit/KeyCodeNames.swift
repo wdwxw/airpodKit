@@ -4,6 +4,7 @@ import Foundation
 
 enum KeyCodeNames {
     private static let special: [CGKeyCode: String] = [
+        CGKeyCode(kVK_Function): "Fn",
         CGKeyCode(kVK_Return): "↩",
         CGKeyCode(kVK_Tab): "⇥",
         CGKeyCode(kVK_Space): "Space",
