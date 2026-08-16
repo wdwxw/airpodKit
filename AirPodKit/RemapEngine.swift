@@ -16,6 +16,7 @@ enum RemapEngine {
         DebugLog.log("=== AirPodKit launched (pid \(ProcessInfo.processInfo.processIdentifier)) ===")
 
         NowPlayingClaim.activate()
+        MusicLaunchGuard.activate()
 
         RemoteButtonMonitor.shared.onButtonPress = { button, isDown in
             guard let shortcut = ShortcutStore.shared.shortcut(for: button) else {
@@ -28,6 +29,7 @@ enum RemapEngine {
             if isDown {
                 DebugLog.log("RemapEngine: synthesizing \(shortcut.displayString) for \(button)")
                 KeystrokeSynthesizer.post(shortcut)
+                MusicLaunchGuard.noteMappedPressHandled()
             }
             return true
         }
