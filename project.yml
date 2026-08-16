@@ -33,3 +33,4 @@ targets:
       - sdk: ApplicationServices.framework
       - sdk: IOKit.framework
       - sdk: ServiceManagement.framework
+      - sdk: MediaPlayer.framework
