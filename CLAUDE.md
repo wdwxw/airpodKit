@@ -66,22 +66,33 @@ If unmapped, the event is returned unmodified (`Unmanaged.passUnretained`,
 handed, this was a real bug once, see git history) so default behavior
 happens.
 
-⚠️ **This mechanism was never empirically confirmed against real hardware.**
-The original plan (Milestone 0) called for a throwaway diagnostic spike
-(`Spike/main.swift` — still present, unbuilt binary gitignored) to log real
-`data1` values from the user's actual wired remote before writing the real
-engine, specifically because third-party USB-C/Lightning dongles can
-surface differently. We built the CLI, got Accessibility/Input Monitoring
-permission working, but never actually captured a real button press in the
-log during that session — development moved on to the full app under time
-pressure before this was confirmed. **If button remapping doesn't work at
-all, this is the first thing to re-check**: rebuild and run
-`Spike/main.swift` (`swiftc -o spike main.swift -framework
-ApplicationServices -framework IOKit -framework Cocoa`), watch its log
-output while pressing the real buttons, and confirm the key types match
-what `RemoteButtonMonitor` expects. If they don't, the fallback (per the
-original plan) is raw `IOHIDManager` device-level capture on HID usage page
-0x0C instead of the `NSSystemDefined` translation layer.
+⚠️ **Must consume both the down AND up half of a mapped press, not just
+down.** Each physical press generates two `NX_SYSDEFINED` events (down
+then up). Originally only the down event was inspected/consumed and the
+up event was unconditionally passed through — the center button mapped to
+a shortcut fired the shortcut correctly on down, but the untouched up
+event still reached the system and triggered Play/Pause anyway, since
+macOS's default handling for that key type acts on the up transition. Fix:
+`RemoteButtonMonitor.onButtonPress` is now called for *both* halves
+(signature is `(RemoteButton, isDown: Bool) -> Bool`) and consumes both
+when mapped; `RemapEngine` only calls `KeystrokeSynthesizer.post` on the
+`isDown == true` call, to avoid firing the shortcut twice per press.
+
+✅ **Confirmed working against the user's real wired remote.** The
+throwaway diagnostic spike (`Spike/main.swift`, still present, unbuilt
+binary gitignored) never actually captured a press during its own test
+session, so the mechanism went unverified for a while — but combo
+shortcuts (modifier + base key) have since been confirmed end-to-end on
+real hardware: pressing the physical button fires the mapped shortcut and
+the original volume/play-pause action is suppressed. If a *future* piece
+of hardware (different cable/dongle) doesn't work, this is still the
+first thing to re-check: rebuild and run `Spike/main.swift` (`swiftc -o
+spike main.swift -framework ApplicationServices -framework IOKit
+-framework Cocoa`), watch its log output while pressing the buttons, and
+confirm the key types match what `RemoteButtonMonitor` expects. If they
+don't, the fallback (per the original plan) is raw `IOHIDManager`
+device-level capture on HID usage page 0x0C instead of the
+`NSSystemDefined` translation layer.
 
 ### Shortcut model (`Shortcut.swift`, `ModifierKey.swift`)
 
@@ -111,6 +122,24 @@ Regular function/arrow keys (Return/Delete/Escape/arrows/F-keys) don't need
 special recorder handling — they arrive as normal `keyDown` events and are
 named via `KeyCodeNames.swift`'s `special` dictionary; anything else falls
 through to `UCKeyTranslate` for a live keyboard-layout-aware character.
+`RecorderNSView` also overrides `performKeyEquivalent(with:)` while
+recording and forwards straight into `keyDown` — Return/Tab/Escape are
+otherwise liable to get intercepted by the window (e.g. for a default
+button) before ever reaching `keyDown`.
+
+⚠️ **`.modifierOnly` synthesis gotcha, already hit once:** a modifier
+key's own press/release is delivered as `flagsChanged`, not
+`keyDown`/`keyUp` — the *only* signal of "which modifier, and whether
+held or released" is the event's `flags` field itself. `KeystrokeSynthesizer`
+used to post `flags: []` on both the down and up event for a lone
+modifier, which is indistinguishable from "nothing pressed" — a total
+no-op the user correctly reported as "single modifier shortcuts do
+nothing." Fixed: the down event now carries `[modifier.comboFlag]`, the
+up event carries `[]`. A `.combo`'s base key is different — both its down
+and up events legitimately carry the *same* modifier flags throughout,
+since they're just reporting what was held during that keystroke rather
+than changing modifier state themselves. Don't "simplify" these back to
+sharing one code path.
 
 ### Permission flow (this broke twice already — read before touching)
 
@@ -142,6 +171,22 @@ process from before a signing-identity change looks identical from the
 Dock/menu bar); (c) is it signed with the stable local identity, not
 ad-hoc — see Signing below.
 
+## "Menu bar icon doesn't show up" — usually not our bug
+
+This has happened before and cost real time chasing the wrong thing: the
+app runs fine, `NSApp`/System Events accessibility queries even report a
+menu bar item existing, but no icon is visible on screen at all — not the
+SF Symbol, not a plain text/emoji label, nothing. Root cause turned out to
+be the user's actual menu bar being completely full of *other* apps'
+status items; macOS drops new status items silently with zero error/log
+output when there's no room, rather than showing an overflow indicator.
+`NSStatusItem`/`MenuBarExtra` from *any* app (tested with a bare
+`NSStatusItem` outside SwiftUI entirely) fail to render the same way in
+that state, so if this recurs: rule out MenuBarExtra/SwiftUI bugs
+immediately by testing with a minimal raw AppKit `NSStatusItem` script,
+and check whether the user's menu bar has free space (ask them to quit a
+couple of other menu bar apps) before spending more time in the code.
+
 ## Signing / TCC persistence
 
 Ad-hoc signing (`codesign --sign -`) produces a different identity every
@@ -164,9 +209,6 @@ packaging step, not yet done). `ENABLE_HARDENED_RUNTIME` is currently
 
 ## Known gaps / not yet done
 
-- Milestone 0 hardware validation never actually completed (see above) —
-  the whole remap mechanism rests on an assumption that hasn't been
-  double-checked against this user's actual hardware.
 - No Developer ID signing / notarization — current signing is dev-only
   local trust, fine for iterating on this machine, not for distributing
   the app elsewhere.
