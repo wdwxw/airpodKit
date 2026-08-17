@@ -41,7 +41,7 @@ struct PopoverRootView: View {
             Divider().padding(.vertical, 6)
 
             Button("退出 AirPodKit") {
-                NSApp.terminate(nil)
+                (NSApp.delegate as? AppDelegate)?.requestTerminationFromMenu()
             }
             .buttonStyle(.plain)
             .font(.system(size: 12.5))

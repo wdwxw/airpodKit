@@ -18,6 +18,28 @@ final class PermissionsManager: ObservableObject {
         // than waiting for the user to notice and open the popover.
         if !accessibilityGranted { requestAccessibility() }
         if !inputMonitoringGranted { requestInputMonitoring() }
+    }
+
+    func refresh() {
+        let newAccessibilityGranted = AXIsProcessTrusted()
+        let newInputMonitoringGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+
+        if accessibilityGranted != newAccessibilityGranted {
+            accessibilityGranted = newAccessibilityGranted
+        }
+        if inputMonitoringGranted != newInputMonitoringGranted {
+            inputMonitoringGranted = newInputMonitoringGranted
+        }
+
+        if newAccessibilityGranted && newInputMonitoringGranted {
+            stopPolling()
+        } else {
+            startPollingIfNeeded()
+        }
+    }
+
+    private func startPollingIfNeeded() {
+        guard timer == nil else { return }
 
         let pollTimer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             self?.refresh()
@@ -28,9 +50,9 @@ final class PermissionsManager: ObservableObject {
         timer = pollTimer
     }
 
-    func refresh() {
-        accessibilityGranted = AXIsProcessTrusted()
-        inputMonitoringGranted = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted
+    private func stopPolling() {
+        timer?.invalidate()
+        timer = nil
     }
 
     func requestAccessibility() {

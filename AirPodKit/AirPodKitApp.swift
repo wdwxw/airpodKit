@@ -10,11 +10,11 @@ struct AirPodKitApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            PopoverRootView()
-        } label: {
-            Image(systemName: "airpods")
+        // The visible menu-bar entry is managed explicitly by AppDelegate.
+        // Keeping only a settings scene prevents SwiftUI from creating a
+        // second, implicit MenuBarExtra instance.
+        Settings {
+            EmptyView()
         }
-        .menuBarExtraStyle(.window)
     }
 }
