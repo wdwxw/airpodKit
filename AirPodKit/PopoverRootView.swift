@@ -13,7 +13,7 @@ struct PopoverRootView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectView(material: .popover, blendingMode: .behindWindow)
+            VisualEffectView(material: .popover)
 
             VStack(alignment: .leading, spacing: 14) {
                 header
@@ -155,14 +155,20 @@ struct PopoverRootView: View {
                 .foregroundStyle(.secondary)
 
             Button {
-                (NSApp.delegate as? AppDelegate)?.requestTerminationFromMenu()
+                AppDelegate.shared?.requestTerminationFromMenu()
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "power")
                     Text("退出")
                 }
-                .font(.system(size: 11))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.secondary)
+                // The icon+text glyphs alone are a tiny, hard-to-hit target
+                // in the popover's bottom-right corner — pad the tappable
+                // area beyond the drawn pixels instead of relying on them.
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

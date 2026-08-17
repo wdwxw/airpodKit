@@ -79,7 +79,7 @@ AirPodKit 目前面向以下语音输入软件的快捷键控制：
 
 下载地址：[https://github.com/wdwxw/airpodKit/releases](https://github.com/wdwxw/airpodKit/releases)
 
-在 Releases 页面下载 `AirPodKit-1.0.dmg`，打开后将 `AirPodKit.app` 拖入“应用程序”文件夹，再从“应用程序”中启动。
+在 Releases 页面下载 `AirPodKit-1.0.1.dmg`，打开后将 `AirPodKit.app` 拖入“应用程序”文件夹，再从“应用程序”中启动。
 
 当前 DMG 使用本地开发证书签名，尚未使用 Apple Developer ID 签名和公证。首次启动如果被 macOS 拦截，请在“系统设置 → 隐私与安全性”中允许打开，或右键点击应用后选择“打开”。
 

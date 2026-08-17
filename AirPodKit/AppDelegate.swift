@@ -7,12 +7,19 @@ import SwiftUI
 /// window. The explicit NSStatusItem keeps the utility visible even when
 /// SwiftUI's MenuBarExtra state is not restored correctly by macOS.
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static weak var shared: AppDelegate?
+
     private var onboardingWindow: NSWindow?
     private var cancellable: AnyCancellable?
     private var activationObserver: NSObjectProtocol?
     private var menuRequestedTermination = false
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+
+    override init() {
+        super.init()
+        Self.shared = self
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -104,8 +111,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// This prevents a Command-Q intended for another app from terminating
     /// AirPodKit when its onboarding window or popover is frontmost.
     func requestTerminationFromMenu() {
+        DebugLog.log("Explicit menu termination requested")
         menuRequestedTermination = true
-        NSApp.terminate(nil)
+        popover?.performClose(nil)
+
+        // NSPopover is backed by a tracking loop. Defer termination until the
+        // button event has finished so the tracking loop cannot swallow the
+        // application termination request.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard self.menuRequestedTermination else { return }
+            NSApp.terminate(nil)
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -113,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DebugLog.log("Ignored implicit application termination request")
             return .terminateCancel
         }
+        DebugLog.log("Accepted explicit menu termination request")
         return .terminateNow
     }
 
