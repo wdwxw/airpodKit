@@ -73,11 +73,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         let hostingController = NSHostingController(rootView: PopoverRootView())
+        // Let the popover track the SwiftUI content's actual (dynamic)
+        // height instead of a hard-coded size — PopoverRootView's height
+        // varies with whether the permissions onboarding card is showing
+        // and with shortcut label lengths, and a fixed contentSize would
+        // just clip the overflow instead of resizing.
+        hostingController.sizingOptions = [.preferredContentSize]
         let popover = NSPopover()
         popover.contentViewController = hostingController
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 300, height: 360)
         self.popover = popover
 
         DebugLog.log("Menu-bar status item created")

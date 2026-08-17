@@ -5,7 +5,9 @@ import Foundation
 /// launched via `open` / login item / Dock). Appends timestamped lines to
 /// ~/Library/Logs/AirPodKit/airpodkit.log.
 enum DebugLog {
-    private static let fileURL: URL = FileManager.default
+    /// Exposed so the popover's "按钮检测" row can reveal the same file in
+    /// Finder — the log itself is still only ever written on `writeQueue`.
+    static let fileURL: URL = FileManager.default
         .urls(for: .libraryDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("Logs/AirPodKit/airpodkit.log")
 

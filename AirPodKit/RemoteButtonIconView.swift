@@ -12,9 +12,13 @@ struct RemoteButtonIconView: View {
     }
 
     var body: some View {
-        Image(systemName: symbolName)
-            .font(.system(size: 14, weight: .medium))
-            .foregroundStyle(.secondary)
-            .frame(width: 18, height: 18)
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(.quaternary)
+            .frame(width: 30, height: 30)
+            .overlay(
+                Image(systemName: symbolName)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            )
     }
 }
