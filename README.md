@@ -6,6 +6,10 @@ AirPodKit 是一个常驻 macOS 菜单栏的小工具。它不负责录音、语
 
 如果你使用 Typeless、闪电说、Wispr Flow、Superwhisper 等语音输入软件，需要按一个快捷键开始/结束输入，或者还要按 `Return` 提交内容，AirPodKit 可以把这些操作搬到耳机线控上，减少手摸键盘的次数。
 
+## 界面预览
+
+![AirPodKit 菜单栏设置界面](assets/airpodkit-menu-bar.png)
+
 ## 它解决什么问题
 
 很多语音输入软件的基本流程是：
@@ -71,7 +75,15 @@ AirPodKit 目前面向以下语音输入软件的快捷键控制：
 
 ## 安装
 
-当前版本通过源码构建使用，暂未提供已签名、公证的安装包。
+### 从 GitHub Release 安装
+
+下载地址：[https://github.com/wdwxw/airpodKit/releases](https://github.com/wdwxw/airpodKit/releases)
+
+在 Releases 页面下载 `AirPodKit-1.0.dmg`，打开后将 `AirPodKit.app` 拖入“应用程序”文件夹，再从“应用程序”中启动。
+
+当前 DMG 使用本地开发证书签名，尚未使用 Apple Developer ID 签名和公证。首次启动如果被 macOS 拦截，请在“系统设置 → 隐私与安全性”中允许打开，或右键点击应用后选择“打开”。
+
+### 从源码构建
 
 ### 环境要求
 

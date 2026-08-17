@@ -6,14 +6,14 @@ struct ShortcutRow: View {
     @Binding var shortcut: Shortcut?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             RemoteButtonIconView(button: button)
-            Text(label).font(.system(size: 12.5))
+            Text(label).font(.system(size: 13, weight: .semibold))
             Spacer()
             ShortcutRecorderField(shortcut: $shortcut)
-                .frame(width: 140, height: 22)
+                .frame(width: 140, height: 24)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .padding(.vertical, 10)
     }
 }
