@@ -11,8 +11,8 @@ struct AirPodKitApp: App {
 
     var body: some Scene {
         // The visible menu-bar entry is managed explicitly by AppDelegate.
-        // Keeping only a settings scene prevents SwiftUI from creating a
-        // second, implicit MenuBarExtra instance.
+        // This empty scene supplies the SwiftUI App lifecycle without adding
+        // another visible window or menu-bar entry.
         Settings {
             EmptyView()
         }

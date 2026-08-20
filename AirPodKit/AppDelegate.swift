@@ -1,17 +1,19 @@
 import AppKit
+import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
-/// Shows a real, front-and-center window guiding the user through granting
 /// Owns the explicit menu-bar status item and the permissions onboarding
-/// window. The explicit NSStatusItem keeps the utility visible even when
-/// SwiftUI's MenuBarExtra state is not restored correctly by macOS.
+/// window. The status item is kept alive by the app delegate for the whole
+/// lifetime of the menu-bar utility.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var shared: AppDelegate?
 
     private var onboardingWindow: NSWindow?
     private var cancellable: AnyCancellable?
     private var activationObserver: NSObjectProtocol?
+    private var commandQMonitor: Any?
+    private var commandQTerminationRequested = false
     private var menuRequestedTermination = false
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
@@ -23,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
+        installCommandQMonitor()
 
         let permissions = PermissionsManager.shared
         cancellable = permissions.$accessibilityGranted
@@ -45,6 +48,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // TCC does not provide a reliable change notification. Refresh
             // when the user returns from System Settings or opens the app.
             PermissionsManager.shared.refresh()
+        }
+    }
+
+    private func installCommandQMonitor() {
+        commandQMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.recordCommandQIfNeeded(event)
+            return event
+        }
+    }
+
+    private func recordCommandQIfNeeded(_ event: NSEvent) {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard event.keyCode == UInt16(kVK_ANSI_Q), modifiers == .command else { return }
+
+        // A shortcut field must still be able to record ⌘Q. The local monitor
+        // sees the key before the field's own key-equivalent handling.
+        guard !(NSApp.keyWindow?.firstResponder is RecorderNSView) else { return }
+
+        commandQTerminationRequested = true
+        DebugLog.log("Command-Q termination request detected")
+
+        // If AppKit handles the key without asking us to terminate, do not let
+        // this one key press authorize a later unrelated termination request.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self, !self.menuRequestedTermination else { return }
+            self.commandQTerminationRequested = false
         }
     }
 
@@ -126,17 +155,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard menuRequestedTermination else {
+        guard menuRequestedTermination || commandQTerminationRequested else {
             DebugLog.log("Ignored implicit application termination request")
             return .terminateCancel
         }
-        DebugLog.log("Accepted explicit menu termination request")
+        DebugLog.log(
+            menuRequestedTermination
+                ? "Accepted explicit menu termination request"
+                : "Accepted Command-Q termination request"
+        )
         return .terminateNow
     }
 
     deinit {
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
+        }
+        if let commandQMonitor {
+            NSEvent.removeMonitor(commandQMonitor)
         }
     }
 
